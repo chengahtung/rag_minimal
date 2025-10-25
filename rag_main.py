@@ -250,7 +250,7 @@ if __name__ == "__main__":
             if st.session_state.use_llm and HAS_RAG_UTILS:
                 try:
                     logging.info("# Sending to LLM")
-                    response = ru.call_llm(question=user_input, top_records=rerank_top_records[:10], stream=True) if rerank_top_records else "",
+                    response = ru.call_llm(question=user_input, top_records=chosen_records[:10], stream=True)
                     # st.write(response)
                     st.markdown("---")
                     st.markdown("## 💬")
