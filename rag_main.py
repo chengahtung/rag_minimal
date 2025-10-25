@@ -5,6 +5,7 @@ from typing import List, Dict, Any
 import gc
 
 import streamlit as st
+import cleanup_and_trim
 
 # import importlib # for hot reload (dev)
 # --- Logging setup ---
@@ -325,4 +326,7 @@ if __name__ == "__main__":
             with st.expander("See most relevant document ids"):
                 st.write("test")
                 st.write("relevant_text")
+
+            # Clean up, free memory
+            cleanup_and_trim.best_effort_idle_release()
 
