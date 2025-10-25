@@ -10,7 +10,13 @@ from sentence_transformers import CrossEncoder
 from dotenv import load_dotenv
 import logging
 import nltk   # optional: for sentence tokenization if available
+import gc
 
+
+try:
+    import torch
+except Exception:
+    torch= None
 
 # Optional Google GenAI (kept optional)
 try:
@@ -150,6 +156,28 @@ def _get_cross_encoder(model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2")
         _CE_CACHE[model_name] = CrossEncoder(model_name)
     return _CE_CACHE[model_name]
 
+# Unload cross encoder. (Release Memory)
+def unload_cross_encoder(model_name: str):
+    """Unload a specific CrossEncoder model from the cache and free its memory."""
+    if model_name in _CE_CACHE:
+        model = _CE_CACHE.pop(model_name)
+
+        # Explicitly delete model attributes (important for GPU/torch models)
+        if hasattr(model, 'model'):
+            del model.model
+        if hasattr(model, 'tokenizer'):
+            del model.tokenizer
+
+        # Clear CUDA memory if used
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        # Force Python garbage collection
+        gc.collect()
+        print(f"✅ Unloaded model: {model_name}")
+    else:
+        print(f"⚠️ Model not found in cache: {model_name}")
+
 def rerank_with_cross_encoder(
     query: str,
     records: List[Dict[str, Any]],
@@ -190,7 +218,6 @@ def _smart_chunks(text: str, max_chars: int) -> List[str]:
         return []
     try:
         import nltk
-        # nltk punkt may not be downloaded in all envs; best-effort
         sents = nltk.tokenize.sent_tokenize(text)
         chunks, cur = [], ""
         for s in sents:
@@ -202,20 +229,36 @@ def _smart_chunks(text: str, max_chars: int) -> List[str]:
                 # if single sentence > max_chars, hard-split the sentence
                 if len(s) > max_chars:
                     for i in range(0, len(s), max_chars):
-                        chunks.append(s[i:i+max_chars])
+                        chunks.append(s[i:i + max_chars])
                     cur = ""
                 else:
                     cur = s
         if cur:
             chunks.append(cur)
+
+        # ✅ Clean up large variables explicitly
+        sents = None
+        cur = None
+
+        import gc
+        gc.collect()
+
         return chunks
+
     except Exception:
-        # fallback: simple sliding window by max_chars
         out = []
         start = 0
         while start < len(text):
             out.append(text[start:start + max_chars])
             start += max_chars
+
+        # ✅ Clean up large variables
+        text = None
+        start = None
+
+        import gc
+        gc.collect()
+
         return out
 
 def _make_pair(query: str, passage: str) -> Tuple[str, str]:
@@ -234,6 +277,7 @@ def rerank_with_cross_encoder_v2(
     blend_retriever_score: float = 0.0,        # weight for retriever score in final scoring (0.0 = ignore)
     reranker_score_weight: float = 1.0,        # weight for reranker score
     ce_predict_fn = None,                      # allows injecting custom CE predict function for testing
+    stay_active = False,
 ) -> List[Tuple[Dict[str, Any], float]]:
     if not records:
         logging.debug("rerank_with_cross_encoder_v2 called with no records")
@@ -252,6 +296,7 @@ def rerank_with_cross_encoder_v2(
         predict_fn = _predict
     else:
         predict_fn = ce_predict_fn
+        ce = None  # no local CE instance when using injected fn
 
     # build pairs and mapping: pair_idx -> record_idx, also keep lengths for weighting
     pairs = []
@@ -367,6 +412,41 @@ def rerank_with_cross_encoder_v2(
         # log title if exists or first 80 chars of document
         title = rec.get("title") or (rec.get("document", "")[:80].replace("\n", " "))
         logging.info("  score=%.4f  title=%s", sc, title)
+
+    logging.info(f"cross encoder stay_active: {stay_active}")
+    if not stay_active:
+        unload_cross_encoder(model_name)
+
+    # --- CLEANUP: explicitly drop big local variables and request GC + GPU cache free ---
+    try:
+        # Set large objects to None so they can be garbage-collected
+        pairs = None
+        mapping = None
+        chunk_lens = None
+        temp = None
+        temp_lens = None
+        reranker_scores = None
+        all_r_scores = None
+        normalized_r = None
+        normalized_retriever = None
+        ce_scores = None
+
+        # Drop model/predictor references (important for GPU / torch)
+        predict_fn = None
+        ce = None
+        # If torch is available, try to free CUDA memory (best-effort)
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            # ignore if torch not installed or any error
+            pass
+        # force a garbage collection sweep
+        gc.collect()
+    except Exception:
+        # ensure that even if cleanup fails, function still returns result
+        logging.exception("Cleanup before return failed")
 
     return out
 

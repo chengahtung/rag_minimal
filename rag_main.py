@@ -2,6 +2,7 @@ import logging
 import time
 from pathlib import Path
 from typing import List, Dict, Any
+import gc
 
 import streamlit as st
 
@@ -46,11 +47,27 @@ st.set_page_config(
 # Get the folder where app.py is located
 app_path = Path(__file__).parent
 
+if "reranker_keep_loaded" not in st.session_state:
+    st.session_state.reranker_keep_loaded = True
+
 if __name__ == "__main__":
     # --- Keep the original sidebar (user asked not to change it) ---
     with st.sidebar:
         st.title("RAG Controls")
         # use_llm = st.checkbox("Use LLM (optional)", value=False)
+        st.session_state.reranker_keep_loaded = st.checkbox(
+            "Keep reranker loaded [Experimental]", value=st.session_state.reranker_keep_loaded, help="⚡Keeps reranker in memory for faster rerank queries. Disable to save memory."
+        )
+
+        if st.button("🧹 Unload Reranker Model"):
+            ru._CE_CACHE.clear()
+            import gc, torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
+            st.success("✅ Reranker model unloaded from memory.")
+
         st.markdown("---")
         st.header("KB / Ingest")
         kb_dir = st.text_input("KB folder (relative)", value="kb", help="Knowledge Base to ingest, defaulted to kb folder in main folder")
@@ -185,7 +202,7 @@ if __name__ == "__main__":
                     # rerank
                     logging.info("Re-ranking...")
                     # rerank_pairs: list[tuple[dict[str, Any], float]]
-                    rerank_pairs = ru.rerank_with_cross_encoder_v2(user_input, top_records) if top_records else []
+                    rerank_pairs = ru.rerank_with_cross_encoder_v2(user_input, top_records, stay_active=st.session_state.reranker_keep_loaded) if top_records else []
                     # transform rerank_pairs to List[Dict[str, Any]] = []
                     for rank, (rec, score) in enumerate(rerank_pairs, start=1):
                         rerank_top_records.append(rec)
@@ -269,6 +286,13 @@ if __name__ == "__main__":
                     response = "No results found in the vector DB."
 
             # logging.info(f"st.session_state.results: {st.session_state.results}" )
+
+            # clear memory
+            try:
+                del results, top_records, rerank_pairs, rerank_top_records
+            except Exception:
+                pass
+            gc.collect()
             
             st.markdown("## 📚 Sources")
 
@@ -296,7 +320,7 @@ if __name__ == "__main__":
                 st.markdown("---")
 
             with st.expander("See retrieved documents"):
-                st.write(results)
+                st.write(st.session_state.results)
 
             with st.expander("See most relevant document ids"):
                 st.write("test")
