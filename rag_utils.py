@@ -12,17 +12,27 @@ import logging
 import nltk   # optional: for sentence tokenization if available
 import gc
 
+try:
+    import convert_docx_to_markdown as docx2md
+except Exception:
+    docx2md = None
 
 try:
     import torch
 except Exception:
-    torch= None
+    torch = None
 
 # Optional Google GenAI (kept optional)
 try:
     import google.generativeai as genai
 except Exception:
     genai = None
+
+# ----------------- Common Path -----------------
+# Get the folder where app.py is located
+app_path = Path(__file__).parent
+# Define nested folder path: app_path/Ingestion/docx
+ingestion_docx_path = app_path / "Ingestion" / "docx"  # C:\Users\rag_minimal\Ingestion\docx\
 
 def call_llm(question: str, top_records: List[Dict[str, Any]], stream=True):
 
@@ -485,10 +495,18 @@ def _doc_id(source_file: str, idx: int) -> str:
     key = f"{source_file}::chunk-{idx}"
     return hashlib.sha1(key.encode("utf-8")).hexdigest()
 
+def _read_with_fallback(path: Path) -> str:
+    """Try UTF-8 then latin-1. Raise last exception if both fail."""
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return path.read_text(encoding="latin-1")
+
 def ingest_kb_to_collection(
     app_dir: Path,
     kb_dir: Path,
-    collection,
+    ingest_docx_flag=False,
+    collection=None,
     chunk_size: int = 100000,
     overlap: int = 200,
     batch_size: int = 64,
@@ -496,6 +514,12 @@ def ingest_kb_to_collection(
 ) -> int:
     if file_globs is None:
         file_globs = ["**/*.md", "**/*.txt"]
+
+    if ingest_docx_flag: # add suffix search to ingest
+        file_globs += ["**/*.docx"]
+
+        # INGEST DOCX : Convert .docx to .md before ingest in [rag_minimal/Ingestion/docx] (if applicable)
+        docx_to_md(kb_dir)
 
     files = []
     for g in file_globs:
@@ -519,19 +543,57 @@ def ingest_kb_to_collection(
     try:
         for fpath in files:
             try:
-                text = fpath.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
-                try:
-                    text = fpath.read_text(encoding="latin-1")
-                except Exception as e:
-                    print(f"Skipping {fpath} due to read error: {e}")
-                    continue
+                text = "" # Initialize text <-- bug prevention, every file should have new ""
+                suffix = fpath.suffix.lower()
+                match suffix:
+                    # ────────────────────────────────
+                    # Markdown / Text Files
+                    # ────────────────────────────────
+                    case ".md" | ".txt":
+                        try:
+                            text = _read_with_fallback(fpath)
+                            logging.info("✅ Read text file: %s", fpath.name)
+                        except Exception as e:
+                            print(f"Skipping {fpath} due to read error: {e}")
+                            continue
+
+                    # ────────────────────────────────
+                    # DOCX Files
+                    # ────────────────────────────────
+                    case ".docx":
+                        # Try matching converted filenames
+                        candidates = [
+                            ingestion_docx_path / f"{fpath.stem}.md",
+                            ingestion_docx_path / f"{fpath.stem} [rag].md",
+                        ]
+
+                        # Find converted .docx->.md file in ingestion_docx_path
+                        found = next((c for c in candidates if c.exists()), None)
+                        if not found:
+                            logging.warning("No converted file found for %s", fpath.name)
+                            continue
+
+                        try:
+                            text = _read_with_fallback(found)
+                            logging.info("📄 Using converted file: %s -> %s", fpath.name, found.name)
+                        except Exception as e:
+                            logging.error("Skipping %s (converted %s) due to read error: %s",fpath.name, found.name, e)
+                            continue
+                    # ────────────────────────────────
+                    # Unsupported file types
+                    # ────────────────────────────────
+                    case _:
+                        logging.info("Skipping unsupported file type: %s", fpath)
+                        continue
+            except Exception as e:
+                logging.exception("Unexpected error processing %s: %s", fpath, e)
+                continue
 
             text = _clean_text(text)
             if not text:
                 continue
 
-            title = _extract_title_from_md(text, fpath.name)
+            title = fpath.stem
             chunks = _chunk_text(text, chunk_size=chunk_size, overlap=overlap)
             file_type = fpath.suffix[1:].lower() or "unknown"  # e.g. ".md" -> "md"
             for idx, chunk in enumerate(chunks):
@@ -578,6 +640,50 @@ def ingest_kb_to_collection(
             dump_f.close()
 
     return count_chunks
+
+def docx_to_md(kb_path: Path):
+    # logging.info(f"ingestion_docx_path: {ingestion_docx_path}")
+    # Create all folders if they don't exist
+    ingestion_docx_path.mkdir(parents=True, exist_ok=True)  # parents=True for nested
+
+    # 🧹 Clear previous files
+    for file in ingestion_docx_path.iterdir():
+        if file.is_file():
+            file.unlink()  # delete file
+        elif file.is_dir():
+            # Optional: remove subdirectories too (recursive)
+            import shutil
+            shutil.rmtree(file)
+    logging.info(f"🧹 Cleaned up folder: {ingestion_docx_path}")
+
+    # get all docx in all nested folders
+    file_globs = ["**/*.docx"]
+    # Collect all docx path into docx_files
+    docx_files = []
+    for g in file_globs:
+        docx_files.extend(sorted(kb_path.glob(g)))
+
+    logging.info(f"Found {len(docx_files)} docx files to ingest under {kb_path}")
+
+    for docx_fpath in docx_files:
+        try:
+            docx_path = Path(docx_fpath)  # get (Path) of docx # example: C:\Users\rag_minimal\WordDocument.docx
+            # for debugging
+            # docx_path = Path(r"C:\Users\xxxx\WordDocument.docx")
+
+            # Get the stem (filename without suffix) and add " [rag]"
+            new_stem = f"{docx_path.stem} [rag]"
+
+            # Construct output file path inside the 'docx' folder
+            output_path = ingestion_docx_path / f"{new_stem}.md" # C:\Users\rag_minimal\Ingestion\docx\WordDocument [rag].md
+            # logging.info(f"output_path: {output_path}")
+
+            # Convert docx to markdown
+            docx2md.docx_to_markdown(docx_path=docx_fpath, output_path=output_path)
+
+        except Exception as e:
+            logging.info(f"⚠️ Skipping {docx_fpath} due to error: {e}")
+            continue  # Explicitly continue to next file
 
 # ----------------- Transform result (Query result to List) ---------------------------
 def transform_result(result: dict) -> List[Dict[str, Any]]:

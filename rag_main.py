@@ -50,6 +50,8 @@ app_path = Path(__file__).parent
 
 if "reranker_keep_loaded" not in st.session_state:
     st.session_state.reranker_keep_loaded = True
+if "ingest_docx" not in st.session_state:
+    st.session_state.ingest_docx = False
 
 if __name__ == "__main__":
     # --- Keep the original sidebar (user asked not to change it) ---
@@ -76,7 +78,13 @@ if __name__ == "__main__":
         overlap = st.number_input("Overlap (chars)", value=200, step=50)
         batch_size = st.number_input("Batch size (upsert)", value=64, step=1)
 
-        if st.button("Ingest KB"):
+        st.caption("Ingest `.txt` and `.md` files defaulted")
+
+        st.session_state.ingest_docx = st.checkbox(
+            "docx", value=st.session_state.ingest_docx, help="Ingest .docx files -> read Docx files and convert into MD files then ingest to collection."
+        )
+
+        if st.button("Ingest KB", help="Ingest KB files and insert into collection for retrieval."):
             logging.info("Ingest button clicked.")
             if not HAS_RAG_UTILS:
                 st.error(
@@ -92,6 +100,7 @@ if __name__ == "__main__":
                     count = ru.ingest_kb_to_collection(
                         app_dir=app_path,
                         kb_dir=kb_path,
+                        ingest_docx_flag=st.session_state.ingest_docx,
                         collection=ru.get_collection(),
                         chunk_size=chunk_size,
                         overlap=overlap,
@@ -181,7 +190,7 @@ if __name__ == "__main__":
                     results = ru.get_collection().query(
                         query_texts=user_input,
                         n_results=10,
-                        where={"type": {"$in": ["md", "txt"]}},
+                        where={"type": {"$in": ["md", "txt","docx"]}},
                         include=["documents", "metadatas", "distances"],
                     )
                     logging.info("Query successful.")
