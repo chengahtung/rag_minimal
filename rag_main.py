@@ -62,18 +62,18 @@ if __name__ == "__main__":
     with st.sidebar:
         st.title("RAG Controls")
         # use_llm = st.checkbox("Use LLM (optional)", value=False)
-        st.session_state.reranker_keep_loaded = st.checkbox(
-            "Keep reranker loaded [Experimental]", value=st.session_state.reranker_keep_loaded, help="⚡Keeps reranker in memory for faster rerank queries. Disable to save memory."
-        )
-
-        if st.button("🧹 Unload Reranker Model"):
-            ru._CE_CACHE.clear()
-            import gc, torch
-
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            gc.collect()
-            st.success("✅ Reranker model unloaded from memory.")
+        # st.session_state.reranker_keep_loaded = st.checkbox(
+        #     "Keep reranker loaded [Experimental]", value=st.session_state.reranker_keep_loaded, help="⚡Keeps reranker in memory for faster rerank queries. Disable to save memory."
+        # )
+        #
+        # if st.button("🧹 Unload Reranker Model"):
+        #     ru._CE_CACHE.clear()
+        #     import gc, torch
+        #
+        #     if torch.cuda.is_available():
+        #         torch.cuda.empty_cache()
+        #     gc.collect()
+        #     st.success("✅ Reranker model unloaded from memory.")
 
         st.markdown("---")
         st.header("Database Controls")
