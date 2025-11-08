@@ -5,6 +5,18 @@ from typing import List, Dict, Any
 import gc
 
 import streamlit as st
+# -- Page config --
+st.set_page_config(
+    page_title="RAG Assistant",
+    page_icon="app.png",
+    #layout="wide",
+    initial_sidebar_state="expanded",
+    menu_items={
+        "Get help": "https://docs.streamlit.io/",
+        "Report a bug": "https://github.com/streamlit/streamlit/issues",
+        "About": "AI-powered RAG Assistant"
+    }
+)
 import cleanup_and_trim
 import file_utils
 
@@ -32,19 +44,6 @@ except Exception:
     HAS_RAG_UTILS = False
     logging.warning("rag_utils not found. Ingest/query buttons will show errors.")
 
-
-# -- Page config --
-st.set_page_config(
-    page_title="RAG Assistant",
-    page_icon="💬",
-    #layout="wide",
-    initial_sidebar_state="expanded",
-    menu_items={
-        "Get help": "https://docs.streamlit.io/",
-        "Report a bug": "https://github.com/streamlit/streamlit/issues",
-        "About": "AI-powered RAG Assistant"
-    }
-)
 
 # Get the folder where app.py is located
 # app_path = Path(__file__).parent
