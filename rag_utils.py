@@ -59,14 +59,17 @@ def call_llm(question: str, top_records: List[Dict[str, Any]], stream=True):
         2. Organize your thoughts and plan your response to ensure a logical flow of information.
         3. Formulate a detailed answer that directly addresses the question, using only the information provided in the context.
         4. Ensure your answer is comprehensive, covering all relevant aspects found in the context.
-        5. If the context doesn't contain sufficient information to fully answer the question, state this clearly in your response.
+        5. Always use technical-style operators. (eg, :, >, <, <>, <=, >=, arrows)
+        6. Always show tables if possible.
+        7. If the context doesn't contain sufficient information to fully answer the question, state this clearly early in your response.
 
         Format your response as follows:
         1. Use clear, concise language.
-        2. Organize your answer into paragraphs for readability.
-        3. Use bullet points or numbered lists where appropriate to break down complex information.
-        4. If relevant, include any headings or subheadings to structure your response.
+        2. Organize your answer into paragraphs for readability, markdown format.
+        3. Use bullet points or numbered lists or tables where appropriate to break down complex information.
+        4. Beautify the response with emojis.
         5. Ensure proper grammar, punctuation, and spelling throughout your answer.
+        6. Always produce output that is **easy for a human to read and understand**, similar to a ledger or scenario report.
                 
         Important: Base your entire response solely on the information provided in the context. Do not include any external knowledge or assumptions not present in the given text.
 
