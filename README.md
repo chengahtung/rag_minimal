@@ -8,8 +8,9 @@ RAG Minimal is here to end that frustration and help you **know what you already
 
 ## ❔ Why I Built This
 
-I often forget where I store notes across multiple folders and drives.  
-Hunting through them wastes time, causes duplicate notes, and interrupts my workflow.  
+- As a software developer, understanding/analyzing a codebase can be time-consuming. After studying complex code, I often take notes to document its behavior and workflow to avoid reanalyzing.
+- I often forget where I store notes across multiple folders and drives.  
+- Hunting through them wastes time, causes duplicate notes, and interrupts my workflow.  
 
 RAG Minimal was created to solve this problem — a lightweight tool that lets you **locate your local notes instantly**.  
 It also helps you **rediscover information you’ve already captured**, so you can work smarter, not harder.
