@@ -6,6 +6,9 @@ venv/
 kb/
 chroma_db/
 
+# Ingestion
+Ingestion/
+
 # Logging files
 kb_chunks.jsonl
 
