@@ -1,0 +1,13 @@
+# Python virtual environment and other files
+venv/
+.env
+
+# Database
+kb/
+chroma_db/
+
+# Logging files
+kb_chunks.jsonl
+
+# Python cache files
+__pycache__/
