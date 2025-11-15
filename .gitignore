@@ -14,3 +14,6 @@ kb_chunks.jsonl
 
 # Python cache files
 __pycache__/
+
+# .idea
+.idea/

@@ -28,7 +28,7 @@ while True:
     try:
         # Generate model response
         client = genai.Client()
-        model_info = client.models.get(model="gemini-2.0-flash")
+        model_info = client.models.get(model="gemini-2.5-flash")
         response = model.generate_content(user_input)
         print("Gemini:", response.text.strip(), "\n")
     except Exception as e:

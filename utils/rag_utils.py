@@ -13,7 +13,7 @@ import nltk   # optional: for sentence tokenization if available
 import gc
 
 try:
-    import convert_docx_to_markdown as docx2md
+    from utils import convert_docx_to_markdown as docx2md
 except Exception:
     docx2md = None
 
@@ -28,11 +28,31 @@ try:
 except Exception:
     genai = None
 
+def get_project_root() -> Path:
+    """
+    Returns the root directory of the project (i.e., the folder where the repo lives).
+    Assumes the utils folder is directly inside the project root.
+    """
+    return Path(__file__).resolve().parent.parent
+
+def get_chroma_db_path() -> Path:
+    """
+    Returns the path to the chroma_db directory at the project root.
+    """
+    return get_project_root() / "chroma_db"
+
+def get_kb_path() -> Path:
+    """
+    Returns the path to the kb directory at the project root.
+    """
+    return get_project_root() / "kb"
+
 # ----------------- Common Path -----------------
 # Get the folder where app.py is located
-app_path = Path(__file__).parent
+app_path = Path(__file__).parent # C:\Users\local-lode\utils\
 # Define nested folder path: app_path/Ingestion/docx
-ingestion_docx_path = app_path / "Ingestion" / "docx"  # C:\Users\rag_minimal\Ingestion\docx\
+ingestion_docx_path = get_project_root() / "Ingestion" / "docx"  # C:\Users\local-lode\Ingestion\docx\
+# -----------------------------------------------
 
 def call_llm(question: str, top_records: List[Dict[str, Any]], stream=True):
 
@@ -521,7 +541,7 @@ def ingest_kb_to_collection(
     if ingest_docx_flag: # add suffix search to ingest
         file_globs += ["**/*.docx"]
 
-        # INGEST DOCX : Convert .docx to .md before ingest in [rag_minimal/Ingestion/docx] (if applicable)
+        # INGEST DOCX : Convert .docx to .md before ingest in [local-lode/Ingestion/docx] (if applicable)
         docx_to_md(kb_dir)
 
     files = []
@@ -536,6 +556,7 @@ def ingest_kb_to_collection(
     count_chunks = 0
 
     dump_path = app_dir / "kb_chunks.jsonl"
+    logging.info(f"dump_path: {dump_path}")
     try:
         dump_f = open(dump_path, "w", encoding="utf-8")
         print(f"Writing chunk dump to {dump_path}")
@@ -677,7 +698,7 @@ def docx_to_md(kb_path: Path):
 
     for docx_fpath in docx_files:
         try:
-            docx_path = Path(docx_fpath)  # get (Path) of docx # example: C:\Users\rag_minimal\WordDocument.docx
+            docx_path = Path(docx_fpath)  # get (Path) of docx # example: C:\Users\local-lode\WordDocument.docx
             # for debugging
             # docx_path = Path(r"C:\Users\xxxx\WordDocument.docx")
 
@@ -685,8 +706,12 @@ def docx_to_md(kb_path: Path):
             new_stem = f"{docx_path.stem} [rag]"
 
             # Construct output file path inside the 'docx' folder
-            output_path = ingestion_docx_path / f"{new_stem}.md" # C:\Users\rag_minimal\Ingestion\docx\WordDocument [rag].md
-            # logging.info(f"output_path: {output_path}")
+            output_path = ingestion_docx_path / f"{new_stem}.md" # C:\Users\local-lode\Ingestion\docx\WordDocument [rag].md
+            logging.info(f"docx_fpath: {docx_fpath}")
+            logging.info(f"output_path: {output_path}")
+
+            if docx2md is None:
+                logging.error("❌docx2md is None — import or initialization failed.")
 
             # Convert docx to markdown
             docx2md.docx_to_markdown(docx_path=docx_fpath, output_path=output_path)
@@ -794,7 +819,8 @@ def chroma_query_with_rerank(query: str, collection) -> None:
 def get_client(db_dir: Optional[str] = None):
     """Return a persistent chroma client (path points to DuckDB+parquet files)."""
     if db_dir is None:
-        db_dir = str(Path(__file__).resolve().parent / "chroma_db")
+        # db_dir = str(Path(__file__).resolve().parent.parent / "chroma_db")
+        db_dir = get_project_root() / "chroma_db"
     Path(db_dir).mkdir(parents=True, exist_ok=True)
     return chromadb.PersistentClient(path=str(db_dir))
 

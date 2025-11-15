@@ -8,7 +8,7 @@ import streamlit as st
 # -- Page config --
 st.set_page_config(
     page_title="RAG Assistant",
-    page_icon="app.png",
+    page_icon="assets/images/app.png",
     #layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -17,8 +17,7 @@ st.set_page_config(
         "About": "AI-powered RAG Assistant"
     }
 )
-import cleanup_and_trim
-import file_utils
+from utils import cleanup_and_trim, rag_utils as ru, file_utils
 
 # import importlib # for hot reload (dev)
 # --- Logging setup ---
@@ -35,7 +34,6 @@ except Exception:
     genai = None
 
 try:
-    import rag_utils as ru
     HAS_RAG_UTILS = True
     logging.info("rag_utils imported successfully.")
     # importlib.reload(ru) # for hot reload # 🔁 ensures latest tweaks always apply
